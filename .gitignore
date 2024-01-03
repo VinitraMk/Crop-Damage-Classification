@@ -1,0 +1,8 @@
+*.zip
+*.tgz
+*.gz
+data/**
+*.pyc
+__pycache__/
+/**/__pycache__/
+config.yaml
