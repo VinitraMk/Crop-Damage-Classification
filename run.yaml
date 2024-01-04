@@ -1,1 +1,22 @@
 # yaml file to run the scripts and model experiments
+transform:
+    resize_dim: 256
+    crop_dim: 224
+train:
+    shuffle_data: True
+    batch_size: 128
+    val_split_method: 'k-fold'
+    k: 5
+    val_percentage: 20
+    loss: 'cross-entropy'
+    batch_interval: 512
+    epoch_interval: 1
+    num_epochs: 10
+model:
+    name: 'resnet18'
+    optimizer: 'Adam'
+    lr: 0.1
+    weight_decay: 0.00001
+    amsgrad: False
+    momentum: 0.9
+test_model: False
