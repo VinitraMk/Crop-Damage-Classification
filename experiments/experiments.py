@@ -2,7 +2,7 @@ from common.utils import get_exp_params
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Subset
-from common.utils import get_accuracy, save_model_chkpt
+from common.utils import get_accuracy, get_config
 
 class Experiment:
     
@@ -19,7 +19,10 @@ class Experiment:
         self.exp_params = get_exp_params()
         self.model = model
         self.optimizer = self.__get_optimizer(self.model, self.exp_params['model'], self.exp_params['model']['name'])
-        self.fr_train_dataset = fr_train_dataset 
+        self.fr_train_dataset = fr_train_dataset
+        cfg = get_config()
+        self.X_key = cfg['X_key']
+        self.y_key = cfg['y_key']
         
     def __loss_fn(self, loss_name = 'cross-entropy'):
         if loss_name == 'cross-entropy':
@@ -46,8 +49,8 @@ class Experiment:
             running_loss = 0.0
             for batch_idx, batch in train_loader:
                 self.optimizer.zero_grad()
-                op = self.model(batch['image'])
-                loss = loss_fn(op, batch['label'])
+                op = self.model(batch[self.X_key])
+                loss = loss_fn(op, batch[self.y_key])
                 loss.backward()
                 self.optimizer.step()
                 running_loss += loss.item()
@@ -65,11 +68,11 @@ class Experiment:
             
             print('Running through validation set')
             for batch_idx, batch in val_loader:
-                lop = self.model(batch['image'])
-                loss = loss_fn(lop, batch['label'])
+                lop = self.model(batch[self.X_key])
+                loss = loss_fn(lop, batch[self.y_key])
                 loss.backward()
                 val_loss += loss.item()
-                val_acc += get_accuracy(lop, batch['label'])
+                val_acc += get_accuracy(lop, batch[self.y_key])
                 
                 if (batch_idx + 1) % batch_ivl == 0:
                     print(f'\tBatch {batch_idx + 1} Last Model Loss: {val_loss / (batch_idx + 1)}')
@@ -191,10 +194,10 @@ class Experiment:
         running_loss = 0.0
         acc = 0
         for _, batch in test_loader:
-            op = model(batch['image'])
-            loss = loss_fn(op, batch['label'])
+            op = model(batch[self.X_key])
+            loss = loss_fn(op, batch[self.y_key])
             running_loss += loss.item()
-            acc = get_accuracy(op, batch['label'])
+            acc = get_accuracy(op, batch[self.y_key])
         print("Loss:", running_loss/len(test_loader))
         print("Accuracy:", acc/len(test_loader), "\n")
         
