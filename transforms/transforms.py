@@ -1,6 +1,7 @@
 from torchvision import transforms, utils
 import torch
 from common.utils import get_config
+import numpy as np
 
 class Resize(object):
     def __init__(self, output_size = 224, transform_y = False):
@@ -23,11 +24,11 @@ class Resize(object):
             new_h, new_w = self.output_size
               
         new_h, new_w = int(new_h), int(new_w)
-        image = transforms.resize(image, (new_h, new_w))
+        image = transforms.functional.resize(image, (new_h, new_w))
         sample[X_key] = image
         if self.transform_y:
             image = sample[y_key]
-            image = transforms.resize(image, (new_h, new_w))
+            image = transforms.functional.resize(image, (new_h, new_w))
             sample[y_key] = image
              
         return sample
@@ -78,13 +79,13 @@ class CenterCrop(object):
         config = get_config()
         X_key, y_key = config['X_key'], config['y_key']
         image = sample[X_key]
-        assert isinstance(image, torch.tensor)
-        image = transforms.functional.center_crop(image)
+        assert isinstance(image, torch.Tensor)
+        image = transforms.functional.center_crop(image, self.output_size)
         sample[X_key] = image
         if self.transform_y:
             image = sample[y_key]
-            assert isinstance(image, torch.tensor)
-            image = transforms.functional.center_crop(image)
+            assert isinstance(image, torch.Tensor)
+            image = transforms.functional.center_crop(image, self.output_size)
             sample[y_key] = image
 
         return sample
@@ -98,12 +99,12 @@ class ToTensor(object):
         config = get_config()
         X_key, y_key = config['X_key'], config['y_key']
         image = sample[X_key]
-        image = image.transpose(2, 0, 1)
-        sample[X_key] = image
+        image = np.transpose(image, (2, 0, 1))
+        sample[X_key] = torch.from_numpy(image)
         if self.transform_y:
             image = sample[y_key]
-            image = image.transpose(2, 0, 1)
-            sample[y_key] = image
+            image = np.transpose(image, (2, 0, 1))
+            sample[y_key] = torch.from_numpy(image)
         return sample
             
             
