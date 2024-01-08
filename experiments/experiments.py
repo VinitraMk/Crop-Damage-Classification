@@ -3,6 +3,8 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader, Subset
 from common.utils import get_accuracy, get_config
+import pandas as pd
+import os
 
 class Experiment:
     
@@ -198,21 +200,25 @@ class Experiment:
         else:
             raise SystemExit("Error: no valid split method passed! Check run.yaml")
         
-    def test(self, model, test_dataset):
+    def test(self, model, test_dataset, lbl_dict):
         model = model.cpu()
         test_loader = DataLoader(test_dataset, batch_size = self.exp_params["train"]["batch_size"], shuffle = True)
         model.eval()
         loss_fn = self.__loss_fn(self.exp_params["train"]["loss"])
         running_loss = 0.0
         acc = 0
+        num2class = lambda x: lbl_dict[x.item()]
+        sub_lbls = ['ID', 'DR', 'G', 'ND', 'WD', 'other']
+        results_df = pd.DataFrame([], columns = sub_lbls)
         print("Running through test dataset")
-        for _, batch in enumerate(test_loader):
-            op = model(batch[self.X_key])
-            loss = loss_fn(op, batch[self.y_key])
-            running_loss += loss.item()
-            acc = get_accuracy(op, batch[self.y_key])
-        print("Loss:", running_loss/len(test_loader))
-        print("Accuracy:", acc/len(test_loader), "\n")
+        for bi, batch in enumerate(test_loader):
+            op = model(batch[self.X_key].float())
+            oplbls = torch.argmax(op, 1)
+            classlbls = list(map(num2class, oplbls))
+            res = list(zip(batch['ID'].tolist(), op.tolist()))
+            batch_df = pd.DataFrame(res, columns = sub_lbls)
+            print(batch_df.columns)
+            results_df.append(batch_df)
+        results_df.to_csv(os.path.join(self.output_dir, "results.csv"), index = False)
         
-        
-        
+
