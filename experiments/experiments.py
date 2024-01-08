@@ -201,7 +201,7 @@ class Experiment:
             raise SystemExit("Error: no valid split method passed! Check run.yaml")
         
     def test(self, model, test_dataset, lbl_dict):
-        model = model.cpu()
+        model = model.to(self.device)
         test_loader = DataLoader(test_dataset, batch_size = self.exp_params["train"]["batch_size"], shuffle = True)
         model.eval()
         loss_fn = self.__loss_fn(self.exp_params["train"]["loss"])
@@ -211,14 +211,19 @@ class Experiment:
         sub_lbls = ['ID', 'DR', 'G', 'ND', 'WD', 'other']
         results_df = pd.DataFrame([], columns = sub_lbls)
         print("Running through test dataset")
-        for bi, batch in enumerate(test_loader):
-            op = model(batch[self.X_key].float())
-            oplbls = torch.argmax(op, 1)
-            classlbls = list(map(num2class, oplbls))
-            res = list(zip(batch['ID'].tolist(), op.tolist()))
-            batch_df = pd.DataFrame(res, columns = sub_lbls)
-            print(batch_df.columns)
-            results_df.append(batch_df)
+        with torch.no_grad():
+            for bi, batch in enumerate(test_loader):
+                print(f"\tRunning through batch {bi}")
+                batch[self.X_key] = batch[self.X_key].float().to(self.device)
+                batch[self.y_key] = batch[self.y_key].to(self.device)
+                op = model(batch[self.X_key].float())
+                oplbls = torch.argmax(op, 1)
+                classlbls = list(map(num2class, oplbls))
+                res = list(zip(batch['id'], op.tolist()))
+                batch_df = pd.DataFrame(res, columns = sub_lbls)
+                results_df.append(batch_df)
+                #del batch_df[self.X_key]
+                #del batch_df[self.y_key]
         results_df.to_csv(os.path.join(self.output_dir, "results.csv"), index = False)
         
 
