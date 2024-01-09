@@ -27,6 +27,7 @@ class Experiment:
         self.X_key = cfg['X_key']
         self.y_key = cfg['y_key']
         self.device = "cuda" if cfg['use_gpu'] else "cpu"
+        self.output_dir = cfg['output_dir']
 
     def __loss_fn(self, loss_name = 'cross-entropy'):
         if loss_name == 'cross-entropy':
@@ -216,14 +217,14 @@ class Experiment:
             for bi, batch in enumerate(test_loader):
                 print(f"\tRunning through batch {bi}")
                 batch[self.X_key] = batch[self.X_key].float().to(self.device)
-                batch[self.y_key] = batch[self.y_key].to(self.device)
-                op = model(batch[self.X_key].float())
+                op = F.softmax(model(batch[self.X_key].float()))
                 oplbls = torch.argmax(op, 1)
                 classlbls = list(map(num2class, oplbls))
-                res = list(zip(batch['id'], op.tolist()))
+                if self.device == "cuda":
+                    batch[self.X_key] = batch[self.X_key].to("cpu")
+                else:
+                    del batch[self.X_key]
+                res = [[id] + preds for id,preds in zip(batch['id'], op.tolist())]
                 batch_df = pd.DataFrame(res, columns = sub_lbls)
-                results_df.append(batch_df)
-                #del batch_df[self.X_key]
-                #del batch_df[self.y_key]
-        results_df.to_csv(os.path.join(self.output_dir, "results.csv"), index = False)
-
+                results_df = pd.concat([results_df, batch_df], 0)
+                results_df.to_csv(os.path.join(self.output_dir, "results.csv"), index = False)

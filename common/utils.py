@@ -47,6 +47,7 @@ def init_config():
     config_params = read_yaml(config_path)
     config_params['root_dir'] = root_dir
     config_params['data_dir'] = data_dir
+    config_params['output_dir'] = os.path.join(root_dir, "output")
     config_params['img_dir'] = os.path.join(root_dir, 'data/input/images')
     config_params['use_gpu'] = torch.cuda.is_available()
     dump_yaml(config_path, config_params)
