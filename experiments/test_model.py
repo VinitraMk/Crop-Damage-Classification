@@ -48,12 +48,16 @@ class ModelTester:
         acc = 0
         num2class = lambda x: lbl_dict[x.item()]
         sub_lbls = ['ID', 'DR', 'G', 'ND', 'WD', 'other']
-        results_df = pd.DataFrame([], columns = sub_lbls)
+        res_file = os.pathth.join(self.output_dir, "results.csv")
+        if not(os.path.exists(res_file)):
+            results_df = pd.DataFrame([], columns = sub_lbls)
+        else:
+            results_df = pd.read_csv(res_file)
         classlbls = []
         print("Running through test dataset")
         with torch.no_grad():
             for bi, batch in enumerate(self.te_loader):
-                print(f"\tRunning through batch {bi}")
+                print(f"\n\tRunning through batch {bi}")
                 batch[self.X_key] = batch[self.X_key].float().to(self.device)
                 op = F.softmax(model(batch[self.X_key].float()), 1)
                 if self.device == "cuda":
@@ -66,7 +70,8 @@ class ModelTester:
                 res = [[id] + preds for id,preds in zip(batch['id'], op.tolist())]
                 batch_df = pd.DataFrame(res, columns = sub_lbls)
                 results_df = pd.concat([results_df, batch_df], 0)
-        if plot_sample_results:
-            self.__plot_results(classlbls) 
-        results_df.to_csv(os.path.join(self.output_dir, "results.csv"), index = False)
-        
+                print(f"\tFinished collecting results for batch {bi}")
+                if plot_sample_results:
+                    self.__plot_results(classlbls) 
+                results_df.to_csv(os.path.join(self.output_dir, "results.csv"), index = False)
+    

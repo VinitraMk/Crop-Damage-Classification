@@ -96,7 +96,9 @@ def save_model_chkpt(model, chkpt_info, chkpt_filename, is_checkpoint = True, be
         json.dump(chkpt_info, fp)
         
 def load_model(model_path):
-    return torch.load(model_path)
+    config_params = get_config()
+    device = "cuda" if config_params["use_gpu"] else "cpu"
+    return torch.load(model_path, map_location = torch.device(device))
 
 def get_modelinfo(json_filename, is_chkpt = True, is_best = False):
     model_info = {}

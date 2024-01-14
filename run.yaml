@@ -6,12 +6,12 @@ train:
     shuffle_data: True
     batch_size: 128
     val_split_method: 'k-fold'
-    k: 2
+    k: 5
     val_percentage: 20
     loss: 'cross-entropy'
     batch_interval: 512
     epoch_interval: 1
-    num_epochs: 1
+    num_epochs: 10
 model:
     name: 'resnet18'
     optimizer: 'Adam'

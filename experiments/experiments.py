@@ -2,7 +2,7 @@ from common.utils import get_exp_params
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Subset
-from common.utils import get_accuracy, get_config
+from common.utils import get_accuracy, get_config, save_experiment_output
 import pandas as pd
 import os
 import torch.nn.functional as F
@@ -72,19 +72,19 @@ class Experiment:
             self.model.eval()
             val_loss = 0.0
             val_acc = 0
-            for batch_idx, batch in enumerate(val_loader):
-                batch[self.X_key] = batch[self.X_key].float().to(self.device)
-                batch[self.y_key] = batch[self.y_key].to(self.device)
-                lop = self.model(batch[self.X_key])
-                loss = loss_fn(lop, batch[self.y_key])
-                lop_lbls = torch.argmax(lop, 1)
-                loss.backward()
-                val_loss += loss.item()
-                val_acc += get_accuracy(lop_lbls, batch[self.y_key])
-
-                if (batch_idx + 1) % batch_ivl == 0:
-                    print(f'\t\tBatch {batch_idx + 1} Last Model Loss: {val_loss / (batch_idx + 1)}')
-                    print(f'\t\tBatch {batch_idx + 1} Best Model Loss: {val_loss / (batch_idx + 1)}')
+            with torch.no_grad():
+                for batch_idx, batch in enumerate(val_loader):
+                    batch[self.X_key] = batch[self.X_key].float().to(self.device)
+                    batch[self.y_key] = batch[self.y_key].to(self.device)
+                    lop = self.model(batch[self.X_key])
+                    loss = loss_fn(lop, batch[self.y_key])
+                    lop_lbls = torch.argmax(lop, 1)
+                    val_loss += loss.item()
+                    val_acc += get_accuracy(lop_lbls, batch[self.y_key])
+    
+                    if (batch_idx + 1) % batch_ivl == 0:
+                        print(f'\t\tBatch {batch_idx + 1} Last Model Loss: {val_loss / (batch_idx + 1)}')
+                        print(f'\t\tBatch {batch_idx + 1} Best Model Loss: {val_loss / (batch_idx + 1)}')
             val_loss /= val_batch_num
             val_acc /= val_batch_num
             val_loss_history.append(val_loss)
@@ -116,13 +116,13 @@ class Experiment:
         return model_info
 
 
-    def train(self):
+    def train(self, model_type = "best_model"):
         train_loader = {}
         val_loader = {}
         self.model = self.model.to(self.device)
         if self.exp_params['train']['val_split_method'] == 'k-fold':
             k = self.exp_params['train']['k']
-            vp = self.exp_params['train']['val_percentage']
+            vp = self.exp_params['train']['val_percentage'] / 100
             fl = len(self.fr_train_dataset)
             fr = list(range(fl))
             vlen = int(vp * fl)
@@ -179,10 +179,11 @@ class Experiment:
             model_info['last_model_valloss'] = lastm_loss
             model_info['last_model_trlosshistory'] = lastm_tlh
             model_info['last_model_vallosshistory'] = lastm_vlh
+            self.save_model(model_info[model_type], model_info, model_type, True, model_type == "best_model")
             return model_info
         elif self.exp_params['train']['val_split_method'] == 'fix-split':
             print("Running straight split")
-            vp = self.exp_params['train']['val_percentage']
+            vp = self.exp_params['train']['val_percentage'] / 100
             vlen = int(vp * len(self.fr_train_dataset))
             val_idxs = np.random.randint(0, len(self.fr_train_dataset), vlen).tolist()
             tr_idxs = [idx not in val_idxs for idx in range(len(self.fr_train_dataset))]
@@ -198,13 +199,18 @@ class Experiment:
                 shuffle = self.exp_params['train']['shuffle_data']
             )
             model_info = self.__conduct_training(train_loader, val_loader)
+            self.save_model(model_info[model_type], model_info, model_type, True, model_type == "best_model")
             return model_info
         else:
             raise SystemExit("Error: no valid split method passed! Check run.yaml")
 
+    def save_model(self, model, chkpt_info, model_type, is_chkpt = True, is_best = True):
+        save_experiment_output(model, chkpt_info, self.exp_params,
+            is_chkpt, model_type, is_best)
+
     def test(self, model, test_dataset, lbl_dict):
         model = model.to(self.device)
-        test_loader = DataLoader(test_dataset, batch_size = self.exp_params["train"]["batch_size"], shuffle = True)
+        test_loader = DataLoader(test_dataset, batch_size = self.exp_params["train"]["batch_size"], shuffle = False)
         model.eval()
         loss_fn = self.__loss_fn(self.exp_params["train"]["loss"])
         running_loss = 0.0
@@ -215,7 +221,6 @@ class Experiment:
         print("Running through test dataset")
         with torch.no_grad():
             for bi, batch in enumerate(test_loader):
-                print(f"\tRunning through batch {bi}")
                 batch[self.X_key] = batch[self.X_key].float().to(self.device)
                 op = F.softmax(model(batch[self.X_key].float()))
                 oplbls = torch.argmax(op, 1)
@@ -228,3 +233,4 @@ class Experiment:
                 batch_df = pd.DataFrame(res, columns = sub_lbls)
                 results_df = pd.concat([results_df, batch_df], 0)
                 results_df.to_csv(os.path.join(self.output_dir, "results.csv"), index = False)
+
