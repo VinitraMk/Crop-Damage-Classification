@@ -22,6 +22,7 @@ class Visualization:
         plt.title("Best model loss history")
         plt.legend()
         plt.show()
+        print('\n\n\n')
         plt.plot(list(range(num_epochs)), self.bestm_vah, label = "Best model validation accuracy history")
         plt.title("Best model validation accuracy history")
         plt.legend()

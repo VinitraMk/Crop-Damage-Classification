@@ -7,10 +7,11 @@ from matplotlib import pyplot as plt
 import os
 import pandas as pd
 import torch.nn.functional as F
+from torchvision.transforms import Normalize
 
 class ModelTester:
 
-    def __init__(self, model, te_dataset):
+    def __init__(self, model, te_dataset, metrics):
         cfg = get_config()
         self.te_dataset = te_dataset
         self.model = model.cpu()
@@ -24,6 +25,7 @@ class ModelTester:
         self.X_key = cfg['X_key']
         self.y_key = cfg['y_key']
         self.device = cfg['device']
+        self.metrics = metrics
 
     def __plot_results(self, predicted_labels, subset_len = 10):
         fr = list(range(subset_len))
@@ -66,6 +68,8 @@ class ModelTester:
         else:
             results_df = pd.DataFrame([], columns = sub_lbls)
             cbi = 0
+
+        normalize = Normalize(self.metrics['mean'], self.metrics['std0'])
         
         print("Running through test dataset")
         with torch.no_grad():
@@ -73,16 +77,15 @@ class ModelTester:
                 print(f"\tRunning through batch {bi}")
                 if bi >= cbi:
                     batch[self.X_key] = batch[self.X_key].float().to(self.device)
-                    op = F.softmax(self.model(batch[self.X_key].float()))
-                    print(op.size())
+                    op = F.softmax(self.model(normalize(batch[self.X_key].float())))
                     oplbls = torch.argmax(op, 1)
-                    print(oplbls.size())
                     classlbls = list(map(num2class, oplbls))
-                    del batch[self.X_key]
                     res = [[id] + preds for id,preds in zip(batch['id'], op.tolist())]
                     batch_df = pd.DataFrame(res, columns = sub_lbls)
                     results_df = pd.concat([results_df, batch_df], 0)
                     results_df.to_csv(rpath, index = False)
+                    del batch[self.X_key]
+                    del batch[self.y_key]
                 else:
                     pass
         

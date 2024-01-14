@@ -6,10 +6,11 @@ import os
 from random import shuffle
 import torch.nn.functional as F
 import pandas as pd
+from torchvision.transforms import Normalize
 
 from common.utils import get_accuracy, get_config, save_experiment_output, save_experiment_chkpt, load_modelpt
 from models.custom_models import get_model
-
+from preprocess.preprocessor import Preprocessor
 
 class Experiment:
 
@@ -33,6 +34,7 @@ class Experiment:
         self.output_dir = cfg['output_dir']
         self.device = 'cuda' if cfg['use_gpu'] else 'cpu'
         self.all_folds_res = {}
+        self.metrics = {}
 
     def __loss_fn(self, loss_name = 'cross-entropy'):
         if loss_name == 'cross-entropy':
@@ -55,6 +57,7 @@ class Experiment:
         val_acc = 0.0
         model_info = {}
         epoch_arr = list(range(epoch_index, num_epochs))
+        normalize = Normalize(self.metrics['mean'], self.metrics['std0'])
 
         for i in epoch_arr:
             print(f'\tRunning Epoch {i}')
@@ -65,12 +68,14 @@ class Experiment:
                 self.optimizer.zero_grad()
                 batch[self.X_key] = batch[self.X_key].float().to(self.device)
                 batch[self.y_key] = batch[self.y_key].to(self.device)
-                op = model(batch[self.X_key])
+                op = model(normalize(batch[self.X_key]))
                 loss = loss_fn(op, batch[self.y_key])
                 loss.backward()
                 self.optimizer.step()
                 tr_loss += (loss.item() * batch[self.X_key].size()[0])
-                torch.cuda.empty_cache() 
+                torch.cuda.empty_cache()
+                del batch[self.X_key]
+                del batch[self.y_key]
             tr_loss /= train_len
             trlosshistory.append(tr_loss)
 
@@ -88,6 +93,8 @@ class Experiment:
                     lop_lbls = torch.argmax(lop, 1)
                     val_acc += (get_accuracy(lop_lbls, batch[self.y_key]) * batch[self.y_key].size()[0])
                     torch.cuda.empty_cache()
+                    del batch[self.X_key]
+                    del batch[self.y_key]
             val_loss /= val_len
             val_acc /= val_len
             vallosshistory.append(val_loss)
@@ -147,6 +154,7 @@ class Experiment:
         model = get_model(self.model_name)
         model = model.to(self.device)
         model, ls, bs = self.__get_experiment_chkpt(model)
+        preop = Preprocessor()
 
         if self.exp_params['train']['val_split_method'] == 'k-fold':
             k = self.exp_params['train']['k']
@@ -191,6 +199,9 @@ class Experiment:
                 for key in bmd:
                     bms[key] = bmd[key]
             best_fold = vset_ei
+            avg_mean = 0
+            avg_std0 = 0
+            avg_std1 = 0
 
             for vi, ei in enumerate(val_eei):
                 print(f"Running split {vi}")
@@ -200,6 +211,15 @@ class Experiment:
                 val_dataset = Subset(self.ftr_dataset, val_idxs)
                 tr_len = len(tr_idxs)
                 val_len = len(tr_idxs)
+                mean, std0, std1 = preop.get_dataset_metrics(train_dataset)
+                self.metrics = {
+                    'mean': mean,
+                    'std0': std0,
+                    'std1': std1
+                }
+                avg_mean += mean
+                avg_std0 += std0
+                avg_std1 += std1
 
                 train_loader = DataLoader(train_dataset,
                     batch_size = self.exp_params['train']['batch_size'],
@@ -242,10 +262,14 @@ class Experiment:
                 }
                 self.save_model_checkpoint(model.state_dict(), self.optimizer.state_dict(), model_info,
                 self.all_folds_res, 'best_state')
-
+            self.metrics = {
+                'mean': avg_mean/k,
+                'std0': avg_std0/k,
+                'std1': avg_std1/k
+            }
             del model_info['fold']
             del model_info['epoch']
-            self.save_model_checkpoint(best_model.state_dict(), None, model_info, None)
+            self.save_model_checkpoint(best_model.state_dict(), None, model_info, self.metrics, None)
             return self.all_folds_res
         elif self.exp_params['train']['val_split_method'] == 'fix-split':
             print("Running straight split")
@@ -261,6 +285,13 @@ class Experiment:
             val_dataset = Subset(self.ftr_dataset, val_idxs)
             tr_len = len(tr_idxs)
             val_len = len(val_idxs)
+            mean, std0, std1 = preop.get_dataset_metrics(train_dataset)
+            self.metrics = {
+                'mean': mean,
+                'std0': std0,
+                'std1': std1
+            }
+
             train_loader = DataLoader(train_dataset,
                 batch_size = self.exp_params['train']['batch_size'],
                 shuffle = self.exp_params['train']['shuffle_data']
@@ -280,15 +311,16 @@ class Experiment:
                     train_loader, val_loader, tr_len, val_len)
             del model_info['fold']
             del model_info['epoch']
-            self.save_model_checkpoint(model.state_dict(), None, model_info, None)
+            self.save_model_checkpoint(model.state_dict(), None, model_info, self.metrics, None)
             return {}
         else:
             raise SystemExit("Error: no valid split method passed! Check run.yaml")
 
     def save_model_checkpoint(self, model_state, optimizer_state, chkpt_info,
+    metrics,
     model_history = None, chkpt_type = 'last_state'):
         if model_history == None:
-            save_experiment_output(model_state, chkpt_info, self.exp_params,
+            save_experiment_output(model_state, metrics, chkpt_info, self.exp_params,
                 True, False)
             os.remove(os.path.join(self.root_dir, "models/checkpoints/current_model.pt"))
         else:

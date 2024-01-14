@@ -120,7 +120,7 @@ def get_model_filename(model_name):
     fname = f'{model_name}_{nowstr}'
     return fname
 
-def save_experiment_output(model_state, chkpt_info, exp_params, is_chkpoint = True, save_as_best = False):
+def save_experiment_output(model_state, metrics, chkpt_info, exp_params, is_chkpoint = True, save_as_best = False):
     model_info = {
         'experiment_params': exp_params,
         'results': {
@@ -132,6 +132,11 @@ def save_experiment_output(model_state, chkpt_info, exp_params, is_chkpoint = Tr
             'valacchistory': chkpt_info['valacchistory'].tolist(),
             'epoch': -1,
             'fold': -1
+        },
+        'metrics': {
+            'mean': metrics['mean'],
+            'std0': metrics['std0'],
+            'std1': metrics['std1']
         }
     }
     save_model(model_state, model_info,
@@ -163,9 +168,7 @@ def get_saved_model(model, model_filename = '', is_chkpt = True, is_best = False
             model_dict = load_modelpt(os.path.join(cfg["output_dir"], f"experiment_results/best_experiments/{model_filename}.pt"))
         else:
             model_dict = load_modelpt(os.path.join(cfg["output_dir"], f"experiment_results/experiments/{model_filename}.pt"))
-    model_state = model.state_dict()
-    for key in model_dict:
-        model_state[key] = model_dict[key]
+    model.load_state_dict(model_dict)
     return model
 
 def save_model_helpers(model_history, optimizer_state, model_filename = '', is_chkpt = True, is_best = False):
