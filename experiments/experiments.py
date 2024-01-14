@@ -5,9 +5,10 @@ from torch.utils.data import DataLoader, Subset
 from common.utils import get_accuracy, get_config
 import pandas as pd
 import os
+import torch.nn.functional as F
 
 class Experiment:
-    
+
     def __get_optimizer(self, model, model_params, optimizer_name = 'Adam'):
         if optimizer_name == 'Adam':
             return torch.optim.Adam(model.parameters(), lr=model_params['lr'], weight_decay = model_params['weight_decay'], amsgrad = model_params['amsgrad'])
@@ -16,7 +17,7 @@ class Experiment:
         else:
             raise SystemExit("Error: no valid optimizer name passed! Check run.yaml file")
 
-    
+
     def __init__(self, model, fr_train_dataset):
         self.exp_params = get_exp_params()
         self.model = model
@@ -26,13 +27,14 @@ class Experiment:
         self.X_key = cfg['X_key']
         self.y_key = cfg['y_key']
         self.device = "cuda" if cfg['use_gpu'] else "cpu"
-        
+        self.output_dir = cfg['output_dir']
+
     def __loss_fn(self, loss_name = 'cross-entropy'):
         if loss_name == 'cross-entropy':
             return torch.nn.CrossEntropyLoss()
         else:
             raise SystemExit("Error: no valid loss function name passed! Check run.yaml")
-        
+
     def __conduct_training(self, train_loader, val_loader):
         loss_fn = self.__loss_fn()
         tr_batch_num = len(train_loader)
@@ -65,7 +67,7 @@ class Experiment:
                     print(f'\t\tBatch {batch_idx + 1} Loss: {running_loss / (batch_idx + 1)}')
             tr_loss = running_loss / tr_batch_num
             tr_loss_history.append(tr_loss)
-            
+
             print('\t\tRunning through validation set')
             self.model.eval()
             val_loss = 0.0
@@ -79,7 +81,7 @@ class Experiment:
                 loss.backward()
                 val_loss += loss.item()
                 val_acc += get_accuracy(lop_lbls, batch[self.y_key])
-                
+
                 if (batch_idx + 1) % batch_ivl == 0:
                     print(f'\t\tBatch {batch_idx + 1} Last Model Loss: {val_loss / (batch_idx + 1)}')
                     print(f'\t\tBatch {batch_idx + 1} Best Model Loss: {val_loss / (batch_idx + 1)}')
@@ -110,10 +112,10 @@ class Experiment:
             'last_model_trlosshistory': torch.tensor(tr_loss_history),
             'last_model_vallosshistory': torch.tensor(val_loss_history)
         }
-                
+
         return model_info
 
-                
+
     def train(self):
         train_loader = {}
         val_loader = {}
@@ -143,7 +145,7 @@ class Experiment:
                 si = ei
                 train_dataset = Subset(self.fr_train_dataset, tr_idxs)
                 val_dataset = Subset(self.fr_train_dataset, val_idxs)
-                
+
                 train_loader = DataLoader(train_dataset,
                 batch_size = self.exp_params['train']['batch_size'],
                 shuffle = self.exp_params['train']['shuffle_data']
@@ -186,7 +188,7 @@ class Experiment:
             tr_idxs = [idx not in val_idxs for idx in range(len(self.fr_train_dataset))]
             train_dataset = Subset(self.fr_train_dataset, tr_idxs)
             val_dataset = Subset(self.fr_train_dataset, val_idxs)
-            
+
             train_loader = DataLoader(train_dataset,
                 batch_size = self.exp_params['train']['batch_size'],
                 shuffle = self.exp_params['train']['shuffle_data']
@@ -199,9 +201,9 @@ class Experiment:
             return model_info
         else:
             raise SystemExit("Error: no valid split method passed! Check run.yaml")
-        
+
     def test(self, model, test_dataset, lbl_dict):
-        model = model.cpu()
+        model = model.to(self.device)
         test_loader = DataLoader(test_dataset, batch_size = self.exp_params["train"]["batch_size"], shuffle = True)
         model.eval()
         loss_fn = self.__loss_fn(self.exp_params["train"]["loss"])
@@ -211,14 +213,18 @@ class Experiment:
         sub_lbls = ['ID', 'DR', 'G', 'ND', 'WD', 'other']
         results_df = pd.DataFrame([], columns = sub_lbls)
         print("Running through test dataset")
-        for bi, batch in enumerate(test_loader):
-            op = model(batch[self.X_key].float())
-            oplbls = torch.argmax(op, 1)
-            classlbls = list(map(num2class, oplbls))
-            res = list(zip(batch['ID'].tolist(), op.tolist()))
-            batch_df = pd.DataFrame(res, columns = sub_lbls)
-            print(batch_df.columns)
-            results_df.append(batch_df)
-        results_df.to_csv(os.path.join(self.output_dir, "results.csv"), index = False)
-        
-
+        with torch.no_grad():
+            for bi, batch in enumerate(test_loader):
+                print(f"\tRunning through batch {bi}")
+                batch[self.X_key] = batch[self.X_key].float().to(self.device)
+                op = F.softmax(model(batch[self.X_key].float()))
+                oplbls = torch.argmax(op, 1)
+                classlbls = list(map(num2class, oplbls))
+                if self.device == "cuda":
+                    batch[self.X_key] = batch[self.X_key].to("cpu")
+                else:
+                    del batch[self.X_key]
+                res = [[id] + preds for id,preds in zip(batch['id'], op.tolist())]
+                batch_df = pd.DataFrame(res, columns = sub_lbls)
+                results_df = pd.concat([results_df, batch_df], 0)
+                results_df.to_csv(os.path.join(self.output_dir, "results.csv"), index = False)
