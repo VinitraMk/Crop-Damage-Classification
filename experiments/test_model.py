@@ -1,10 +1,9 @@
 #script for testing the model
 
-from common.utils import get_exp_params, get_accuracy, get_config, save_model_chkpt, get_model_filename, save_experiment_output
+from common.utils import get_exp_params, get_accuracy, get_config, get_model_filename, save_experiment_output
 from torch.utils.data import DataLoader, Subset
 import torch
 from matplotlib import pyplot as plt
-from common import colorspaces
 import os
 import pandas as pd
 import torch.nn.functional as F
@@ -24,6 +23,7 @@ class ModelTester:
         self.output_dir = cfg['output_dir']
         self.X_key = cfg['X_key']
         self.y_key = cfg['y_key']
+        self.device = cfg['device']
 
     def __plot_results(self, predicted_labels, subset_len = 10):
         fr = list(range(subset_len))
@@ -40,33 +40,50 @@ class ModelTester:
         plt.show()
         plt.savefig(os.path.join(self.output_dir, "sample_test_results.png"))
 
-    def test_and_save_csv(self, model, lbl_dict, plot_sample_results = False):
-        model = model.to(self.device)
-        model.eval()
-        loss_fn = self.__loss_fn(self.exp_params["train"]["loss"])
+    def test_and_save_csv(self, lbl_dict, plot_sample_results = False):
+        self.model = self.model.to(self.device)
+        test_loader = DataLoader(self.te_dataset,
+            batch_size = self.exp_params["train"]["batch_size"], shuffle = False)
+        self.model.eval()
         running_loss = 0.0
-        acc = 0
+        acc = 0.0
         num2class = lambda x: lbl_dict[x.item()]
         sub_lbls = ['ID', 'DR', 'G', 'ND', 'WD', 'other']
-        results_df = pd.DataFrame([], columns = sub_lbls)
-        classlbls = []
+
+        rpath = os.path.join(self.output_dir, "results.csv")
+        cbi = 0
+        bsize = self.exp_params['train']['batch_size']
+        if os.path.exists(rpath):
+            results_df = pd.read_csv(rpath)
+            no_rows = len(results_df)
+            if no_rows % bsize == 0:
+                cbi = (no_rows // bsize) - 1
+                cbin = cbi * bsize
+            else:
+                cbi = no_rows // bsize
+                cbin = cbi * bsize
+            cbir = list(range(cbin, no_rows))
+            results_df = results_df.drop(labels = cbir, axis = 0)
+        else:
+            results_df = pd.DataFrame([], columns = sub_lbls)
+            cbi = 0
+        
         print("Running through test dataset")
         with torch.no_grad():
-            for bi, batch in enumerate(self.te_loader):
+            for bi, batch in enumerate(test_loader):
                 print(f"\tRunning through batch {bi}")
-                batch[self.X_key] = batch[self.X_key].float().to(self.device)
-                op = F.softmax(model(batch[self.X_key].float()), 1)
-                if self.device == "cuda":
-                    batch[self.X_key] = batch[self.X_key].to("cpu")
-                else:
+                if bi >= cbi:
+                    batch[self.X_key] = batch[self.X_key].float().to(self.device)
+                    op = F.softmax(self.model(batch[self.X_key].float()))
+                    print(op.size())
+                    oplbls = torch.argmax(op, 1)
+                    print(oplbls.size())
+                    classlbls = list(map(num2class, oplbls))
                     del batch[self.X_key]
-                # predicted labels
-                oplbls = torch.argmax(op, 1)
-                classlbls = list(map(num2class, oplbls))
-                res = [[id] + preds for id,preds in zip(batch['id'], op.tolist())]
-                batch_df = pd.DataFrame(res, columns = sub_lbls)
-                results_df = pd.concat([results_df, batch_df], 0)
-        if plot_sample_results:
-            self.__plot_results(classlbls) 
-        results_df.to_csv(os.path.join(self.output_dir, "results.csv"), index = False)
+                    res = [[id] + preds for id,preds in zip(batch['id'], op.tolist())]
+                    batch_df = pd.DataFrame(res, columns = sub_lbls)
+                    results_df = pd.concat([results_df, batch_df], 0)
+                    results_df.to_csv(rpath, index = False)
+                else:
+                    pass
         
