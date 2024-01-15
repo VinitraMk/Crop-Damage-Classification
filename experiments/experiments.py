@@ -23,7 +23,7 @@ class Experiment:
             raise SystemExit("Error: no valid optimizer name passed! Check run.yaml file")
 
 
-    def __init__(self, model_name, ftr_dataset):
+    def __init__(self, model_name, ftr_dataset, all_folds_metrics):
         self.exp_params = get_exp_params()
         self.model_name = model_name
         self.ftr_dataset = ftr_dataset
@@ -34,6 +34,7 @@ class Experiment:
         self.output_dir = cfg['output_dir']
         self.device = 'cuda' if cfg['use_gpu'] else 'cpu'
         self.all_folds_res = {}
+        self.all_folds_metrics = all_folds_metrics
         self.metrics = {}
 
     def __loss_fn(self, loss_name = 'cross-entropy'):
@@ -151,12 +152,12 @@ class Experiment:
     def train(self, model_type = "best_model"):
         train_loader = {}
         val_loader = {}
-        model = get_model(self.model_name)
-        model = model.to(self.device)
-        model, ls, bs = self.__get_experiment_chkpt(model)
-        preop = Preprocessor()
-
+        
         if self.exp_params['train']['val_split_method'] == 'k-fold':
+            model = get_model(self.model_name)
+            model = model.to(self.device)
+            model, ls, bs = self.__get_experiment_chkpt(model)
+
             k = self.exp_params['train']['k']
             fl = len(self.ftr_dataset)
             fr = list(range(fl))
@@ -199,9 +200,6 @@ class Experiment:
                 for key in bmd:
                     bms[key] = bmd[key]
             best_fold = vset_ei
-            avg_mean = 0
-            avg_std0 = 0
-            avg_std1 = 0
 
             for vi, ei in enumerate(val_eei):
                 print(f"Running split {vi}")
@@ -211,23 +209,17 @@ class Experiment:
                 val_dataset = Subset(self.ftr_dataset, val_idxs)
                 tr_len = len(tr_idxs)
                 val_len = len(tr_idxs)
-                mean, std0, std1 = preop.get_dataset_metrics(train_dataset)
-                self.metrics = {
-                    'mean': mean,
-                    'std0': std0,
-                    'std1': std1
-                }
-                avg_mean += mean
-                avg_std0 += std0
-                avg_std1 += std1
+                self.metrics = self.all_folds_metrics[vi]
 
                 train_loader = DataLoader(train_dataset,
                     batch_size = self.exp_params['train']['batch_size'],
-                    shuffle = False
+                    shuffle = False,
+                    num_workers = 1
                 )
                 val_loader = DataLoader(val_dataset,
                     batch_size = self.exp_params['train']['batch_size'],
-                    shuffle = False
+                    shuffle = False,
+                    num_workers = 1
                 )
 
                 if ls != None:
@@ -248,7 +240,8 @@ class Experiment:
                     bestm_vlh = model_info["vallosshistory"]
                     bestm_tlh = model_info["trlosshistory"]
                     bestm_vah = model_info["valacchistory"]
-                    best_fold = model_info["fold"]
+                    best_fold = vi
+
                 model_info = {
                     'model_state': best_model.state_dict(),
                     'valloss': bestm_valloss,
@@ -262,16 +255,18 @@ class Experiment:
                 }
                 self.save_model_checkpoint(model.state_dict(), self.optimizer.state_dict(), model_info,
                 self.all_folds_res, 'best_state')
-            self.metrics = {
-                'mean': avg_mean/k,
-                'std0': avg_std0/k,
-                'std1': avg_std1/k
-            }
-            del model_info['fold']
+                model = get_model(self.model_name)
+                model = model.to(self.device)
+
             del model_info['epoch']
-            self.save_model_checkpoint(best_model.state_dict(), None, model_info, self.metrics, None)
+            self.save_model_checkpoint(best_model.state_dict(), None, model_info, None)
             return self.all_folds_res
         elif self.exp_params['train']['val_split_method'] == 'fix-split':
+            model = get_model(self.model_name)
+            model = model.to(self.device)
+            model, ls, bs = self.__get_experiment_chkpt(model)
+            preop = Preprocessor()
+            
             print("Running straight split")
             epoch_index = 0 if ls == None else ls['epoch'] + 1
             vp = self.exp_params['train']['val_percentage'] / 100
@@ -285,20 +280,17 @@ class Experiment:
             val_dataset = Subset(self.ftr_dataset, val_idxs)
             tr_len = len(tr_idxs)
             val_len = len(val_idxs)
-            mean, std0, std1 = preop.get_dataset_metrics(train_dataset)
-            self.metrics = {
-                'mean': mean,
-                'std0': std0,
-                'std1': std1
-            }
+            self.metrics = all_folds_metrics = preop.get_dataset_metrics(train_dataset, 'fixed-split')
 
             train_loader = DataLoader(train_dataset,
                 batch_size = self.exp_params['train']['batch_size'],
-                shuffle = self.exp_params['train']['shuffle_data']
+                shuffle = self.exp_params['train']['shuffle_data'],
+                num_workers = 1
             )
             val_loader = DataLoader(val_dataset,
                 batch_size = self.exp_params['train']['batch_size'],
-                shuffle = self.exp_params['train']['shuffle_data']
+                shuffle = self.exp_params['train']['shuffle_data'],
+                num_workers = 1
             )
 
             if ls != None:
@@ -309,18 +301,16 @@ class Experiment:
             else:
                 model, model_info = self.__conduct_training(model, -1, epoch_index,
                     train_loader, val_loader, tr_len, val_len)
-            del model_info['fold']
             del model_info['epoch']
-            self.save_model_checkpoint(model.state_dict(), None, model_info, self.metrics, None)
+            self.save_model_checkpoint(model.state_dict(), None, model_info, None)
             return {}
         else:
             raise SystemExit("Error: no valid split method passed! Check run.yaml")
 
     def save_model_checkpoint(self, model_state, optimizer_state, chkpt_info,
-    metrics,
     model_history = None, chkpt_type = 'last_state'):
         if model_history == None:
-            save_experiment_output(model_state, metrics, chkpt_info, self.exp_params,
+            save_experiment_output(model_state, chkpt_info, self.exp_params,
                 True, False)
             os.remove(os.path.join(self.root_dir, "models/checkpoints/current_model.pt"))
         else:

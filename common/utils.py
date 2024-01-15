@@ -40,6 +40,16 @@ def dump_yaml(ypath, datadict):
     with open(ypath, 'w') as outfile:
         yaml.dump(datadict, outfile, default_flow_style=False)
 
+def read_json(json_path):
+    json_data = {}
+    with open(json_path, 'r') as fp:
+        json_data = json.load(fp)
+    return json_data
+
+def dump_json(data, json_path):
+    with open(json_path, 'w') as fp:
+        json.dump(data, fp)
+
 def init_config():
     root_dir = os.getcwd()
     data_dir = os.path.join(root_dir, 'data')
@@ -120,7 +130,7 @@ def get_model_filename(model_name):
     fname = f'{model_name}_{nowstr}'
     return fname
 
-def save_experiment_output(model_state, metrics, chkpt_info, exp_params, is_chkpoint = True, save_as_best = False):
+def save_experiment_output(model_state, chkpt_info, exp_params, is_chkpoint = True, save_as_best = False):
     model_info = {
         'experiment_params': exp_params,
         'results': {
@@ -131,12 +141,7 @@ def save_experiment_output(model_state, metrics, chkpt_info, exp_params, is_chkp
             'vallosshistory': chkpt_info['vallosshistory'].tolist(),
             'valacchistory': chkpt_info['valacchistory'].tolist(),
             'epoch': -1,
-            'fold': -1
-        },
-        'metrics': {
-            'mean': metrics['mean'],
-            'std0': metrics['std0'],
-            'std1': metrics['std1']
+            'fold': chkpt_info['fold']
         }
     }
     save_model(model_state, model_info,

@@ -1,54 +1,29 @@
 import os
-from common.utils import get_config
+from common.utils import get_config, get_exp_params, dump_json
 import pandas as pd
 from PIL import Image
 import numpy as np
 import torch
 from torchvision.io import read_image
+from random import shuffle
+from torch.utils.data import DataLoader, Subset
 
 class Preprocessor:
 
-    def __init__(self, data_filesuffix = 224):
+    def __init__(self):
         cfg = get_config()
         self.image_dir = cfg["img_dir"]
+        '''
         self.train_labels = pd.read_csv(os.path.join(cfg["data_dir"], "input/Train.csv"))
         self.test_labels = pd.read_csv(os.path.join(cfg["data_dir"], "input/Test.csv"))
         self.processed_img_dir = os.path.join(cfg["data_dir"], "processed_input")
+        '''
         self.X_key = cfg['X_key']
         self.y_key = cfg['y_key']
-        self.data_filesuffix = data_filesuffix
+        self.root_dir = cfg["root_dir"]
+        self.exp_params = get_exp_params()
         
-        
-    def transform_input(self, transform):
-        train_files = self.train_labels["filename"].tolist()
-        test_files = self.test_labels["filename"].tolist()
-        train_data = np.empty((1, self.data_filesuffix, self.data_filesuffix, 3))
-        test_data = np.empty((1, self.data_filesuffix, self.data_filesuffix, 3))
-        print('Iterating through train files')
-        for i, tf in enumerate(train_files):
-            img = read_image(os.path.join(self.image_dir, tf))
-            sample = { self.X_key: img }
-            img = transform(sample)[self.X_key]
-            img = img.cpu().detach().numpy()
-            img = np.transpose(img, (1, 2, 0))
-            train_data = np.concatenate((train_data, np.expand_dims(img, 0)))
-        train_data = train_data[1:]
-        np.savez_compressed(os.path.join(self.processed_img_dir, f"train_{self.data_filesuffix}"),  train_data)
-        del train_data
-        print('\nIterating through test files')
-        for i, tf in enumerate(test_files):
-            img = read_image(os.path.join(self.image_dir, tf))
-            sample = { self.X_key: img }
-            img = transform(sample)[self.X_key]
-            img = img.cpu().detach().numpy()
-            img = np.transpose(img, (1, 2, 0))
-            test_data = np.concatenate((test_data, np.expand_dims(img, 0)))
-        test_data = test_data[1:]
-        np.savez_compressed(os.path.join(self.processed_img_dir, f"test_{self.data_filesuffix}"), test_data)
-        del test_data
-    
-    def get_dataset_metrics(self, dataset):
-        dataloader = torch.utils.data.DataLoader(dataset, batch_size=128, shuffle=False)
+    def __get_metric(self, dataloader):
         pop_mean = []
         pop_std0 = []
         pop_std1 = []
@@ -74,6 +49,45 @@ class Preprocessor:
         pop_std1 = np.array(pop_std1).mean(axis=0)
         pop_std1 = [x/255 for x in pop_std1]
         return pop_mean, pop_std0, pop_std1
+
+    def get_dataset_metrics(self, dataset, method = 'k-fold'):
+        if method == 'k-fold':
+            k = self.exp_params['train']['k']
+            fl = len(dataset)
+            fr = list(range(fl))
+            shuffle(fr)
+            vlen = fl // k
+            si = 0
+            vset_ei = fl // k
+            val_eei = list(range(vset_ei, fl, vlen))
+            preop = Preprocessor()
+            all_folds_metrics = {}
+            
+            for vi, ei in enumerate(val_eei):
+                print(f"\tCalculating metric for split {vi} starting with {si}, ending with {ei}")
+                val_idxs = fr[si:ei]
+                tr_idxs = [fi for fi in fr if fi not in val_idxs]
+                train_dataset = Subset(dataset, tr_idxs)
+                train_loader = DataLoader(train_dataset,
+                    batch_size = 128,
+                    shuffle = False,
+                    num_workers=1
+                )
+                all_folds_metrics[vi] = self.__get_metric(train_loader)
+                si = ei
+                jpath = os.path.join(self.root_dir, 'models/checkpoints/all_folds_metrics.json')
+                dump_json(all_folds_metrics, jpath)
+            return all_folds_metrics
+        else:
+            train_loader = DataLoader(dataset,
+                batch_size = 128,
+                shuffle = False,
+                num_workers=1,
+                persistent_workers=True
+            )
+            jpath = os.path.join(self.root_dir, 'models/checkpoints/all_folds_metrics.json')
+            dump_json(all_folds_metrics, jpath)
+            return self.__get_metric(train_loader)
 
     def make_label_csv(self):
         ## This function is for implementing code that constructs a csv file
