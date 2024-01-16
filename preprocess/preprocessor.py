@@ -67,7 +67,6 @@ class Preprocessor:
                     collate_fn=image_collate
                 )
                 all_folds_metrics[vi] = self.__get_metric(train_loader, data_transform)
-                si = ei
                 jpath = os.path.join(self.root_dir, 'models/checkpoints/all_folds_metrics.json')
                 dump_json(all_folds_metrics, jpath)
                 print(f'\tSaved metrics of fold {vi}\n')
