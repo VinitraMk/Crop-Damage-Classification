@@ -245,7 +245,8 @@ def convert_model2current(model, model_filename, is_chkpt = True, is_best = Fals
     return new_curr
 
 def image_collate(batch):
-    batchlist = list(map(np.array, zip(*batch)))
+    npconv = lambda x: np.array(x, dtype=object)
+    batchlist = list(map(npconv, zip(*batch)))
     return batchlist
 
 def insert_index_2csv(csv_path):
