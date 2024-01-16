@@ -5,6 +5,8 @@ import os
 import yaml
 from datetime import datetime
 import json
+import pandas as pd
+import numpy as np
 
 root_dir = ''
 config_params = {}
@@ -242,4 +244,13 @@ def convert_model2current(model, model_filename, is_chkpt = True, is_best = Fals
     torch.save(new_curr, "current_model.pt")
     return new_curr
 
+def image_collate(batch):
+    batchlist = list(map(np.array, zip(*batch)))
+    return batchlist
+
+def insert_index_2csv(csv_path):
+    df = pd.read_csv(csv_path)
+    if 'index' not in df.columns:
+        df.index.name = 'index'
+        df.to_csv(csv_path)
 
