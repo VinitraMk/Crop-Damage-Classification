@@ -7,6 +7,8 @@ import pandas as pd
 import torch.nn.functional as F
 from torchvision.transforms import Normalize, Compose
 import numpy as np
+from tqdm import tqdm
+import warnings
 
 class ModelTester:
 
@@ -42,6 +44,7 @@ class ModelTester:
         plt.savefig(os.path.join(self.output_dir, "sample_test_results.png"))
 
     def test_and_save_csv(self, lbl_dict, plot_sample_results = False):
+        warnings.filterwarnings('ignore')
         self.model = self.model.to(self.device)
         test_loader = DataLoader(self.te_dataset,
             batch_size = self.exp_params["train"]["batch_size"], shuffle = False,
@@ -71,10 +74,8 @@ class ModelTester:
 
         data_transforms = Compose(self.data_transforms)
         normalize = Normalize(self.metrics['mean'], self.metrics['std0'])
-        print("Running through test dataset")
         with torch.no_grad():
-            for bi, batch in enumerate(test_loader):
-                print(f"\tRunning through batch {bi}")
+            for bi, batch in enumerate(tqdm(test_loader, desc = 'Running through test dataset: ', position = 0, leave = True)):
                 if bi >= cbi:
                     img_batch = list(map(data_transforms, batch[1]))
                     img_batch = np.stack(img_batch, 0)

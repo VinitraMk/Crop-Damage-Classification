@@ -8,6 +8,8 @@ import torch.nn.functional as F
 import pandas as pd
 from torchvision.transforms import Normalize, Compose
 import time
+from tqdm import tqdm
+import warnings
 
 from common.utils import get_accuracy, get_config, save_experiment_output, save_experiment_chkpt, load_modelpt, image_collate
 from models.custom_models import get_model
@@ -58,14 +60,15 @@ class Experiment:
         epoch_arr = list(range(epoch_index, num_epochs))
         data_transforms = Compose(self.data_transforms)
         normalize = Normalize(self.metrics['mean'], self.metrics['std0'])
-
+        warnings.filterwarnings("ignore")
+        
         for i in epoch_arr:
             print(f'\tRunning Epoch {i}')
             model.train()
             tr_loss = 0.0
-            print(f'\t\tRunning through training dataset')
+            #print(f'\t\tRunning through training dataset')
             sf = time.time()
-            for batch_idx, batch in enumerate(train_loader):
+            for batch_idx, batch in enumerate(tqdm(train_loader, desc = '\t\tRunning through training set', position = 0, leave = True)):
                 self.optimizer.zero_grad()
                 img_batch = list(map(data_transforms, batch[1]))
                 img_batch = np.stack(img_batch, 0)
@@ -82,12 +85,12 @@ class Experiment:
             tr_loss /= train_len
             trlosshistory.append(tr_loss)
 
-            print('\t\tRunning through validation set')
+            #print('\t\tRunning through validation set')
             model.eval()
             val_loss = 0.0
             val_acc = 0.0
             with torch.no_grad():
-                for batch_idx, batch in enumerate(val_loader):
+                for batch_idx, batch in enumerate(tqdm(val_loader, desc = '\t\tRunning through validation set', position = 0, leave = True)):
                     img_batch = list(map(data_transforms, batch[1]))
                     img_batch = np.stack(img_batch, 0)
                     img_batch = normalize(torch.from_numpy(img_batch)).to(self.device)
@@ -330,4 +333,5 @@ class Experiment:
             os.remove(os.path.join(self.root_dir, "models/checkpoints/current_model.pt"))
         else:
             save_experiment_chkpt(model_state, optimizer_state, chkpt_info, model_history, chkpt_type)
+
 
