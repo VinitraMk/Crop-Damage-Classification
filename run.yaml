@@ -6,7 +6,7 @@ train:
     shuffle_data: False
     batch_size: 128
     val_split_method: 'k-fold'
-    k: 2
+    k: 3
     val_percentage: 20
     loss: 'cross-entropy'
     epoch_interval: 1

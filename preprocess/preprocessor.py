@@ -51,13 +51,12 @@ class Preprocessor:
             vlen = fl // k
             si = 0
             vset_ei = fl // k
-            val_eei = list(range(vset_ei, fl, vlen))
-            if val_eei[-1] <= fl and (val_eei[-1] + vlen) <= (fl + vlen):
-                val_eei.append(val_eei[-1] + vlen)
+            val_eei = list(range(si, fl, vlen))
             preop = Preprocessor()
             all_folds_metrics = {}
             
-            for vi, ei in enumerate(val_eei):
+            for vi, si in enumerate(val_eei):
+                ei = si + vlen
                 print(f"\tCalculating metric for split {vi} starting with {si}, ending with {ei}")
                 val_idxs = fr[si:ei]
                 tr_idxs = [fi for fi in fr if fi not in val_idxs]

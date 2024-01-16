@@ -145,13 +145,9 @@ class Experiment:
             model_dict = saved_model["model_state"]
             model.load_state_dict(model_dict) 
             self.all_folds_res = saved_model["model_history"]
-            self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
-            ops = saved_model['optimizer_state']
-            self.optimizer.load_state_dict(ops)
-            return model, saved_model["last_state"], saved_model["best_state"]
+            return model, saved_model["last_state"], saved_model["best_state"], saved_model["optimizer_state"]
         else:
-            self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
-            return model, None, None
+            return model, None, None, None
 
     def train(self, model_type = "best_model"):
         train_loader = {}
@@ -160,7 +156,7 @@ class Experiment:
         if self.exp_params['train']['val_split_method'] == 'k-fold':
             model = get_model(self.model_name)
             model = model.to(self.device)
-            model, ls, bs = self.__get_experiment_chkpt(model)
+            model, ls, bs, ops = self.__get_experiment_chkpt(model)
 
             k = self.exp_params['train']['k']
             fl = len(self.ftr_dataset)
@@ -174,6 +170,7 @@ class Experiment:
                 trlosshistory = []
                 vallosshistory = []
                 valacchistory = []
+                self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
             elif ls['epoch'] == -1:
                 si = ls['fold'] + vlen
                 epoch_index = 0
@@ -183,6 +180,7 @@ class Experiment:
                 valacchistory = []
                 model = get_model(self.model_name)
                 model = model.to(self.device)
+                self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
             else:
                 si = ls['fold'] + vlen
                 epoch_index = ls['epoch'] + 1
@@ -190,6 +188,8 @@ class Experiment:
                 trlosshistory = ls['trlosshistory'].tolist()
                 vallosshistory = ls['vallosshistory'].tolist()
                 valacchistory = ls['valacchistory'].tolist()
+                self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
+                self.optimizer.load_state_dict(ops)
             #get best model state if it exists
             bestm_valacc = 0.0 if bs == None else bs['valacc']
             bestm_valloss = 99999 if bs == None else bs['valloss']
@@ -267,6 +267,8 @@ class Experiment:
                 self.all_folds_res, 'best_state')
                 model = get_model(self.model_name)
                 model = model.to(self.device)
+                self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
+
 
             self.save_model_checkpoint(best_model.state_dict(), None, model_info, None)
             return self.all_folds_res
@@ -274,6 +276,7 @@ class Experiment:
             model = get_model(self.model_name)
             model = model.to(self.device)
             model, ls, bs = self.__get_experiment_chkpt(model)
+            self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
             preop = Preprocessor()
             
             print("Running straight split")
