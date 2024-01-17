@@ -7,3 +7,5 @@ __pycache__/
 /**/__pycache__/
 config.yaml
 starter-code/
+models/checkpoints/current_model.pt
+models/checkpoints/last_model.pt
