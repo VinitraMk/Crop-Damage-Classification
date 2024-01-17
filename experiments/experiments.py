@@ -160,6 +160,7 @@ class Experiment:
             model = get_model(self.model_name)
             model = model.to(self.device)
             model, ls, bs, ops = self.__get_experiment_chkpt(model)
+            print(ls)
 
             k = self.exp_params['train']['k']
             fl = len(self.ftr_dataset)
@@ -185,7 +186,7 @@ class Experiment:
                 model = model.to(self.device)
                 self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
             else:
-                si = ls['fold'] + vlen
+                si = ls['fold']
                 epoch_index = ls['epoch'] + 1
                 val_eei = list(range(si, fl, vlen))
                 trlosshistory = ls['trlosshistory'].tolist()
@@ -204,9 +205,7 @@ class Experiment:
             if bs != None:
                 best_model = get_model()
                 bmd = bs['model_state']
-                bms = best_model.state_dict()
-                for key in bmd:
-                    bms[key] = bmd[key]
+                best_model.load_state_dict(bmd)
             best_fold = 0
 
             for vi, si in enumerate(val_eei):
