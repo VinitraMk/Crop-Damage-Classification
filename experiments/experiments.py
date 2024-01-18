@@ -161,6 +161,7 @@ class Experiment:
             model = model.to(self.device)
             model, ls, bs, ops = self.__get_experiment_chkpt(model)
             print(ls)
+            print('\n\n')
 
             k = self.exp_params['train']['k']
             fl = len(self.ftr_dataset)
