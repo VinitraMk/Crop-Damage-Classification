@@ -164,7 +164,7 @@ class Experiment:
             print('\n\n')
 
             k = self.exp_params['train']['k']
-            fl = len(self.ftr_dataset)
+            fl = len(self.ftr_dataset) - 1
             fr = list(range(fl))
             vlen = fl // k
 
@@ -202,6 +202,7 @@ class Experiment:
             bestm_tlh = torch.zeros(self.exp_params['train']['num_epochs']) if bs == None else bs['trlosshistory']
             bestm_vlh = torch.zeros(self.exp_params['train']['num_epochs']) if bs == None else bs['vallosshistory']
             bestm_vah = torch.zeros(self.exp_params['train']['num_epochs']) if bs == None else bs['valacchistory']
+            best_fold = 0 if bs == None else bs['fold']
             best_model = {}
             if bs != None:
                 best_model = get_model()
@@ -255,25 +256,23 @@ class Experiment:
                 valacchistory = []
                 vallosshistory = []
 
-                model_info = {
-                    'model_state': best_model.state_dict(),
-                    'valloss': bestm_valloss,
-                    'trloss': bestm_trloss,
-                    'valacc': bestm_valacc,
-                    'trlosshistory': bestm_tlh,
-                    'vallosshistory': bestm_vlh,
-                    'valacchistory': bestm_vah,
-                    'fold': best_fold,
-                    'epoch': -1,
-                }
                 self.save_model_checkpoint(model.state_dict(), self.optimizer.state_dict(), model_info,
                 self.all_folds_res, 'best_state')
                 model = get_model(self.model_name)
                 model = model.to(self.device)
                 self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
                 epoch_index = 0
-
-
+            model_info = {
+                'model_state': best_model.state_dict(),
+                'valloss': bestm_valloss,
+                'trloss': bestm_trloss,
+                'valacc': bestm_valacc,
+                'trlosshistory': bestm_tlh,
+                'vallosshistory': bestm_vlh,
+                'valacchistory': bestm_vah,
+                'fold': best_fold,
+                'epoch': -1,
+            }
             self.save_model_checkpoint(best_model.state_dict(), None, model_info, None)
             return self.all_folds_res
         elif self.exp_params['train']['val_split_method'] == 'fixed-split':

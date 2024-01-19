@@ -22,7 +22,16 @@ def get_model(model_name = "resnet18", get_weights = False):
             weights = torchvision.models.Inception_V3_Weights.IMAGENET1K_V2
             model = torchvision.models.inception_v3(weights=weights)
             model_id2name = weights.meta["categories"]
-    else:
+        else:
             model = torchvision.models.inception_v3()
+    elif model_name.lower() == "alexnet":
+        if get_weights:
+            weights = torchvision.models.AlexNet_Weights.IMAGENET1K_V1
+            model = torchvision.models.alexnet(weights=weights)
+            model_id2name = weights.meta["categories"]
+        else:
+            model = torchvision.models.alexnet()
     
     return model, model_id2name
+
+
