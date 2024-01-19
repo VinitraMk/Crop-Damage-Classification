@@ -271,6 +271,7 @@ class Experiment:
                 model = get_model(self.model_name)
                 model = model.to(self.device)
                 self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
+                epoch_index = 0
 
 
             self.save_model_checkpoint(best_model.state_dict(), None, model_info, None)
