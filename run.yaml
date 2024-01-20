@@ -5,14 +5,14 @@ transform:
 train:
     shuffle_data: False
     batch_size: 128
-    val_split_method: 'k-fold'
+    val_split_method: 'fixed-split'
     k: 3
     val_percentage: 20
     loss: 'cross-entropy'
     epoch_interval: 1
-    num_epochs: 5
+    num_epochs: 3
 model:
-    name: 'resnet18'
+    name: 'alexnet'
     optimizer: 'Adam'
     lr: 0.001
     weight_decay: 0.00001

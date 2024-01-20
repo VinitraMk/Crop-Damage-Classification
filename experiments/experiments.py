@@ -203,12 +203,12 @@ class Experiment:
             bestm_vlh = torch.zeros(self.exp_params['train']['num_epochs']) if bs == None else bs['vallosshistory']
             bestm_vah = torch.zeros(self.exp_params['train']['num_epochs']) if bs == None else bs['valacchistory']
             best_model = {}
+            model_info = {}
             if bs != None:
                 best_model = get_model()
                 bmd = bs['model_state']
                 best_model.load_state_dict(bmd)
             best_fold = 0
-
             for vi, si in enumerate(val_eei):
                 ei = si + vlen
                 print(f"Running split {vi} starting at {si} and ending with {ei}")
@@ -272,16 +272,27 @@ class Experiment:
                 model = model.to(self.device)
                 self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
                 epoch_index = 0
-
+            model_info = {
+                'model_state': best_model.state_dict(),
+                'valloss': bestm_valloss,
+                'trloss': bestm_trloss,
+                'valacc': bestm_valacc,
+                'trlosshistory': bestm_tlh,
+                'vallosshistory': bestm_vlh,
+                'valacchistory': bestm_vah,
+                'fold': best_fold,
+                'epoch': -1,
+            }
 
             self.save_model_checkpoint(best_model.state_dict(), None, model_info, None)
             return self.all_folds_res
         elif self.exp_params['train']['val_split_method'] == 'fixed-split':
             model = get_model(self.model_name)
             model = model.to(self.device)
-            model, ls, bs = self.__get_experiment_chkpt(model)
+            model, ls, bs, ops = self.__get_experiment_chkpt(model)
             self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
-            preop = Preprocessor()
+            if ops != None:
+                self.optimizer.load_state_dict(ops)
             
             print("Running straight split")
             epoch_index = 0 if ls == None else ls['epoch'] + 1
