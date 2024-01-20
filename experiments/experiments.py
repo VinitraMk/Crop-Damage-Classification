@@ -11,7 +11,7 @@ import time
 from tqdm import tqdm
 import warnings
 
-from common.utils import get_accuracy, get_config, save_experiment_output, save_experiment_chkpt, load_modelpt, image_collate
+from common.utils import get_accuracy, get_config, save_experiment_output, save_experiment_chkpt, load_modelpt, image_collate, save_model_helpers
 from models.custom_models import get_model
 from preprocess.preprocessor import Preprocessor
 
@@ -135,7 +135,7 @@ class Experiment:
             'fold': fold_si,
             'epoch': -1
         }
-        self.all_folds_res[fold_idx] = model_info
+        #self.all_folds_res[fold_idx] = model_info
         self.save_model_checkpoint(model.state_dict(), self.optimizer.state_dict(),
         model_info, self.all_folds_res, 'last_state')
         return model, model_info
@@ -273,8 +273,8 @@ class Experiment:
                 'fold': best_fold,
                 'epoch': -1,
             }
-            self.save_model_checkpoint(best_model.state_dict(), None, model_info, None)
-            return self.all_folds_res
+            self.save_model_checkpoint(best_model.state_dict(), self.optimizer.state_dict(),
+            model_info, self.all_folds_res, '', True)
         elif self.exp_params['train']['val_split_method'] == 'fixed-split':
             model = get_model(self.model_name)
             model = model.to(self.device)
@@ -330,16 +330,17 @@ class Experiment:
                     train_loader, val_loader, tr_len, val_len,
                     trlosshistory, vallosshistory, valacchistory)
             model_info['fold'] = 0
-            self.save_model_checkpoint(model.state_dict(), None, model_info, None)
-            return {}
+            self.all_folds_res[0] = model_info
+            self.save_model_checkpoint(model.state_dict(), self.optimizer.state_dict(), model_info, self.all_folds_res, '', True)
         else:
             raise SystemExit("Error: no valid split method passed! Check run.yaml")
 
     def save_model_checkpoint(self, model_state, optimizer_state, chkpt_info,
-    model_history = None, chkpt_type = 'last_state'):
-        if model_history == None:
+    model_history = None, chkpt_type = 'last_state', is_last = False):
+        if is_last:
             save_experiment_output(model_state, chkpt_info, self.exp_params,
                 True, False)
+            save_model_helpers(model_history, optimizer_state, '', True, False)
             os.remove(os.path.join(self.root_dir, "models/checkpoints/current_model.pt"))
         else:
             save_experiment_chkpt(model_state, optimizer_state, chkpt_info, model_history, chkpt_type)

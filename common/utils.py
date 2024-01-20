@@ -210,9 +210,10 @@ def get_model_data(mh_filename, is_chkpt = True, is_best = False):
             mhpath = os.path.join(cfg["root_dir"], f"experiment_results/experiments/{mh_filename}_history.pt")
             opath = os.path.join(cfg["root_dir"], f"experiment_results/experiments/{mh_filename}_optimizer.pt")
 
-    return torch.load(mpath, map_location = torch.device(cfg["device"])),
-    torch.load(mhpath, map_location = torch.device(cfg["device"])),
-    torch.load(opath, map_location = torch.device(cfg["device"]))
+    model_state = load_modelpt(mpath)
+    model_history = torch.load(mhpath, map_location = torch.device(cfg["device"]))
+    optimizer_state = torch.load(opath, map_location = torch.device(cfg["device"]))
+    return model_state, model_history, optimizer_state
 
 def convert_model2current(model, model_filename, is_chkpt = True, is_best = False):
     saved_model_state, saved_model_history, saved_model_optimizer = get_model_data(model_filename, is_chkpt, is_best)

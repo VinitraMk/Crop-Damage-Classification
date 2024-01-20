@@ -76,7 +76,12 @@ class Preprocessor:
             return all_folds_metrics
         elif self.exp_params['train']['val_split_method'] == 'fixed-split':
             all_folds_metrics = {}
-            train_loader = DataLoader(dataset,
+            vp = self.exp_params['train']['val_percentage'] / 100
+            fl = len(dataset)
+            vlen = int(vp * fl)
+            tr_idxs = list(range(fl))[vlen:]
+            tr_dataset = Subset(dataset, tr_idxs)
+            train_loader = DataLoader(tr_dataset,
                 batch_size = self.exp_params['train']['batch_size'],
                 shuffle = False,
                 collate_fn=image_collate
