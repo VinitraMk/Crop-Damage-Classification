@@ -1,7 +1,7 @@
 # yaml file to run the scripts and model experiments
 transform:
-    resize_dim: 256
-    crop_dim: 224
+    resize_dim: 350
+    crop_dim: 256
 train:
     shuffle_data: False
     batch_size: 128
@@ -10,7 +10,7 @@ train:
     val_percentage: 20
     loss: 'cross-entropy'
     epoch_interval: 1
-    num_epochs: 3
+    num_epochs: 2
 model:
     name: 'alexnet'
     optimizer: 'Adam'

@@ -164,7 +164,7 @@ class Experiment:
             print('\n\n')
 
             k = self.exp_params['train']['k']
-            fl = len(self.ftr_dataset)
+            fl = len(self.ftr_dataset) - 1
             fr = list(range(fl))
             vlen = fl // k
 
@@ -202,6 +202,7 @@ class Experiment:
             bestm_tlh = torch.zeros(self.exp_params['train']['num_epochs']) if bs == None else bs['trlosshistory']
             bestm_vlh = torch.zeros(self.exp_params['train']['num_epochs']) if bs == None else bs['vallosshistory']
             bestm_vah = torch.zeros(self.exp_params['train']['num_epochs']) if bs == None else bs['valacchistory']
+            best_fold = 0 if bs == None else bs['fold']
             best_model = {}
             model_info = {}
             if bs != None:
@@ -255,17 +256,6 @@ class Experiment:
                 valacchistory = []
                 vallosshistory = []
 
-                model_info = {
-                    'model_state': best_model.state_dict(),
-                    'valloss': bestm_valloss,
-                    'trloss': bestm_trloss,
-                    'valacc': bestm_valacc,
-                    'trlosshistory': bestm_tlh,
-                    'vallosshistory': bestm_vlh,
-                    'valacchistory': bestm_vah,
-                    'fold': best_fold,
-                    'epoch': -1,
-                }
                 self.save_model_checkpoint(model.state_dict(), self.optimizer.state_dict(), model_info,
                 self.all_folds_res, 'best_state')
                 model = get_model(self.model_name)
@@ -283,25 +273,33 @@ class Experiment:
                 'fold': best_fold,
                 'epoch': -1,
             }
-
             self.save_model_checkpoint(best_model.state_dict(), None, model_info, None)
             return self.all_folds_res
         elif self.exp_params['train']['val_split_method'] == 'fixed-split':
             model = get_model(self.model_name)
             model = model.to(self.device)
             model, ls, bs, ops = self.__get_experiment_chkpt(model)
+            print(ls)
+            print('\n\n')
             self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
             if ops != None:
                 self.optimizer.load_state_dict(ops)
+            if ls != None:
+                trlosshistory = ls['trlosshistory'].tolist()
+                vallosshistory = ls['vallosshistory'].tolist()
+                valacchistory = ls['valacchistory'].tolist()
+            else:
+                trlosshistory = []
+                vallosshistory = []
+                valacchistory = []
             
             print("Running straight split")
             epoch_index = 0 if ls == None else ls['epoch'] + 1
-            trlosshistory, vallosshistory, valacchistory = [] if ls == None else ls['trlosshistory'].tolist(), ls['vallosshistory'].tolist(), ls['valacchistory'].tolist()
             vp = self.exp_params['train']['val_percentage'] / 100
             fl = len(self.ftr_dataset)
             vlen = int(vp * fl)
             fr = list(range(fl))
-            if self.exp_params['shuffle_data']:
+            if self.exp_params['train']['shuffle_data']:
                 shuffle(fr)
             val_idxs = fr[:vlen]
             tr_idxs = fr[vlen:]
@@ -309,7 +307,7 @@ class Experiment:
             val_dataset = Subset(self.ftr_dataset, val_idxs)
             tr_len = len(tr_idxs)
             val_len = len(val_idxs)
-            self.metrics = all_folds_metrics = preop.get_dataset_metrics(train_dataset, 'fixed-split')
+            self.metrics = self.all_folds_metrics[0]
 
             train_loader = DataLoader(train_dataset,
                 batch_size = self.exp_params['train']['batch_size'],
