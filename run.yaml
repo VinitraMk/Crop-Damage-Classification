@@ -5,7 +5,7 @@ transform:
 train:
     shuffle_data: False
     batch_size: 128
-    val_split_method: 'k-fold'
+    val_split_method: 'fixed-split'
     k: 3
     val_percentage: 20
     loss: 'cross-entropy'

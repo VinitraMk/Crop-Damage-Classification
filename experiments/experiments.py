@@ -278,18 +278,29 @@ class Experiment:
         elif self.exp_params['train']['val_split_method'] == 'fixed-split':
             model = get_model(self.model_name)
             model = model.to(self.device)
-            model, ls, bs = self.__get_experiment_chkpt(model)
+            model, ls, bs, ops = self.__get_experiment_chkpt(model)
+            print(ls)
+            print('\n\n')
             self.optimizer = self.__get_optimizer(model, self.exp_params['model'], self.exp_params['model']['optimizer'])
+            if ops != None:
+                self.optimizer.load_state_dict(ops)
+            if ls != None:
+                trlosshistory = ls['trlosshistory'].tolist()
+                vallosshistory = ls['vallosshistory'].tolist()
+                valacchistory = ls['valacchistory'].tolist()
+            else:
+                trlosshistory = []
+                vallosshistory = []
+                valacchistory = []
             preop = Preprocessor()
             
             print("Running straight split")
             epoch_index = 0 if ls == None else ls['epoch'] + 1
-            trlosshistory, vallosshistory, valacchistory = [] if ls == None else ls['trlosshistory'].tolist(), ls['vallosshistory'].tolist(), ls['valacchistory'].tolist()
             vp = self.exp_params['train']['val_percentage'] / 100
             fl = len(self.ftr_dataset)
             vlen = int(vp * fl)
             fr = list(range(fl))
-            if self.exp_params['shuffle_data']:
+            if self.exp_params['train']['shuffle_data']:
                 shuffle(fr)
             val_idxs = fr[:vlen]
             tr_idxs = fr[vlen:]
@@ -297,7 +308,7 @@ class Experiment:
             val_dataset = Subset(self.ftr_dataset, val_idxs)
             tr_len = len(tr_idxs)
             val_len = len(val_idxs)
-            self.metrics = all_folds_metrics = preop.get_dataset_metrics(train_dataset, 'fixed-split')
+            self.metrics = self.all_folds_metrics[0]
 
             train_loader = DataLoader(train_dataset,
                 batch_size = self.exp_params['train']['batch_size'],

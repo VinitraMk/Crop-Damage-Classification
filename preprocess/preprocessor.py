@@ -10,8 +10,7 @@ from torch.utils.data import DataLoader, Subset
 from torchvision.transforms import Compose
 from tqdm import tqdm
 import warnings
-
-warnings.filterwarnings("ignore")
+warnings.filterwarnings('ignore')
 
 class Preprocessor:
 
@@ -23,7 +22,7 @@ class Preprocessor:
     def __get_metric(self, dataloader, data_transform):
         pop_mean = []
         pop_std0 = []
-        for i, data in enumerate(tqdm(dataloader, desc = "\t\tGettings metrics", position = 0, leave = True)):
+        for i, data in enumerate(tqdm(dataloader, desc = '\t\tGetting metrics', position = 0, leave = True)):
             # shape (batch_size, 3, height, width)
             _, imgs , _ = data
             img_batch = list(map(data_transform, imgs))
