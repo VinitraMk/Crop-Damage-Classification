@@ -10,7 +10,7 @@ train:
     val_percentage: 20
     loss: 'cross-entropy'
     epoch_interval: 1
-    num_epochs: 2
+    num_epochs: 30
 model:
     name: 'alexnet'
     optimizer: 'Adam'
