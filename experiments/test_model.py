@@ -24,6 +24,7 @@ class ModelTester:
         )
         self.output_dir = cfg['output_dir']
         self.device = cfg['device']
+        self.exp_name = cfg['exp_name']
         self.metrics = metrics
         self.data_transforms = data_transforms
         self.test_df = pd.read_csv(os.path.join(cfg['data_dir'], 'input/Test.csv'))
@@ -55,6 +56,10 @@ class ModelTester:
         num2class = lambda x: lbl_dict[x.item()]
         sub_lbls = ['ID', 'DR', 'G', 'ND', 'WD', 'other']
         rpath = os.path.join(self.output_dir, "results.csv")
+        exppath = os.path.join(self.output_dir, "experiment_results/experiments/{self.exp_name}")
+        if not(os.path.exists(exppath)):
+            os.mkdir(exppath)
+        exp_res_path = os.path.join(exppath, "{self.exp_name}_results.csv")
         cbi = 0
         bsize = self.exp_params['train']['batch_size']
         if os.path.exists(rpath):
@@ -89,6 +94,7 @@ class ModelTester:
                     batch_df = pd.DataFrame(res, columns = sub_lbls)
                     results_df = pd.concat([results_df, batch_df], 0)
                     results_df.to_csv(rpath, index = False)
+                    results_df.to_csv(exp_res_path)
                     del batch
                 else:
                     pass

@@ -341,6 +341,8 @@ class Experiment:
             save_experiment_output(model_state, chkpt_info, self.exp_params,
                 True, False)
             save_model_helpers(model_history, optimizer_state, '', True, False)
+            save_experiment_output(model_state, chkpt_info, self.exp_params,
+                False, False)
             os.remove(os.path.join(self.root_dir, "models/checkpoints/current_model.pt"))
         else:
             save_experiment_chkpt(model_state, optimizer_state, chkpt_info, model_history, chkpt_type)
