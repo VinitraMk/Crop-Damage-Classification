@@ -12,10 +12,10 @@ train:
     epoch_interval: 1
     num_epochs: 30
 model:
-    name: 'alexnet'
+    name: 'resnet18'
     optimizer: 'Adam'
-    lr: 0.001
+    lr: 0.01
     weight_decay: 0.00001
     amsgrad: False
-    momentum: 0.9
+    momentum: 0.85
 test_model: False

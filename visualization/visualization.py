@@ -33,7 +33,7 @@ class Visualization:
 
     def __get_performance_metrics(self):
         k = self.exp_params['train']['k']
-        if self.model_history != None:
+        if self.exp_params['train']['val_split_method'] == 'k-fold':
             avg_valloss = 0.0
             avg_valacc = 0.0
             avg_trloss = 0.0
@@ -50,6 +50,9 @@ class Visualization:
             print("Average Training Loss", avg_trloss)
             print("Average Validation Loss", avg_valloss)
             print("Average Validation Accuracy", avg_valacc)
+        else:
+            print("\nTraining Loss\tValidation Loss\tValidation Accuracy")
+            print(f"{self.model_history[0]['trloss']}\t{self.model_history[0]['valloss']}\t{self.model_history[0]['valacc']}")
 
     def get_results(self):
         self.__plot_loss_history()

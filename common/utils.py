@@ -63,6 +63,7 @@ def init_config():
     config_params['img_dir'] = os.path.join(root_dir, 'data/input/images')
     config_params['use_gpu'] = torch.cuda.is_available()
     config_params['device'] = 'cuda' if torch.cuda.is_available() else 'cpu'
+    config_params['exp_name'] = get_model_filename()
     dump_yaml(config_path, config_params)
 
 def get_exp_params():
@@ -98,7 +99,6 @@ def save_model(model_state, chkpt_info, chkpt_filename = 'last_model', is_checkp
             fpath = os.path.join(config_params['output_dir'], 'experiment_results/best_experiments')
         else:
             fpath = os.path.join(config_params['output_dir'], 'experiment_results/experiments')
-    
     mpath = os.path.join(fpath, f'{chkpt_filename}.pt')
     jpath = os.path.join(fpath, f'{chkpt_filename}.json')
     torch.save(
@@ -107,6 +107,19 @@ def save_model(model_state, chkpt_info, chkpt_filename = 'last_model', is_checkp
     )
     with open(jpath, 'w') as fp:
         json.dump(chkpt_info, fp)
+
+    if not(is_checkpoint):
+        dir_path = os.path.join(fpath, chkpt_filename)
+        if not(os.path.exists(dir_path)):
+            os.mkdir(dir_path)
+        mpath = os.path.join(dir_path, f'{chkpt_filename}.pt')
+        jpath = os.path.join(dir_path, f'{chkpt_filename}.json')
+        torch.save(
+            model_state,
+            mpath
+        )
+        with open(jpath, 'w') as fp:
+            json.dump(chkpt_info, fp)
         
 def load_modelpt(model_path):
     config_params = get_config()
@@ -133,6 +146,7 @@ def get_model_filename(model_name):
     return fname
 
 def save_experiment_output(model_state, chkpt_info, exp_params, is_chkpoint = True, save_as_best = False):
+    cfg = get_config()
     model_info = {
         'experiment_params': exp_params,
         'results': {
@@ -148,6 +162,8 @@ def save_experiment_output(model_state, chkpt_info, exp_params, is_chkpoint = Tr
     }
     save_model(model_state, model_info,
         f'last_model', is_chkpoint, save_as_best)
+    if not(is_chkpoint):
+        save_model(model_state, model_info, f'{cfg["exp_name"]}_model', is_chkpoint, save_as_best)
 
 def save_experiment_chkpt(model_state, optimizer_state, chkpt_info, model_history, chkpt_type = "last_state"):
     cfg = get_config()
