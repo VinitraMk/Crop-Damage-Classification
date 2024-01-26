@@ -63,7 +63,6 @@ def init_config():
     config_params['img_dir'] = os.path.join(root_dir, 'data/input/images')
     config_params['use_gpu'] = torch.cuda.is_available()
     config_params['device'] = 'cuda' if torch.cuda.is_available() else 'cpu'
-    config_params['exp_name'] = get_model_filename()
     dump_yaml(config_path, config_params)
 
 def get_exp_params():
